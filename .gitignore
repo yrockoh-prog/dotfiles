@@ -9,3 +9,7 @@ Thumbs.db
 
 # Local overrides (optional; uncomment if you use)
 # config/local/
+
+# Dotfiles we want tracked (override global ignore for dotfiles if any)
+!tmux/.tmux.conf
+!zsh/.zshrc
