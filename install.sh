@@ -148,6 +148,7 @@ ZSH_CUSTOM=${ZSH_CUSTOM:-~/.oh-my-zsh/custom}
 
 # 설정 파일 연결
 echo "🔗 Linking config files..."
+link_file "$DOTFILES_DIR/zsh/.zshenv" "$HOME/.zshenv"
 link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
 link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 mkdir -p "$HOME/.tmux"

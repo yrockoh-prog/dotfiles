@@ -1,3 +1,5 @@
+# 로케일/IME는 .zshenv에서 설정 (Linux 터미널 한글)
+
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
 
@@ -5,6 +7,10 @@ ZSH_THEME="robbyrussell"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting docker)
 
 source $ZSH/oh-my-zsh.sh
+
+# nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 
 # 기본 에디터
 export EDITOR='nvim'

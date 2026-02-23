@@ -21,6 +21,10 @@ Linux / macOS에서 사용하는 쉘, 터미널 멀티플렉서, 에디터, AI �
 
 ### 1. Zsh (`zsh/`)
 
+- **Linux 터미널 한글**  
+  - `.zshenv`: 모든 zsh 세션에서 `LANG`/`LC_ALL`/`LC_CTYPE=en_US.UTF-8` 설정 (한글 깨짐 방지).  
+  - Linux에서만 `GTK_IM_MODULE`/`QT_IM_MODULE`/`XMODIFIERS`를 ibus 또는 fcitx로 지정해 한글 입력(IME) 가능.  
+  - **한글이 여전히 깨지면**: 시스템에 로케일이 없을 수 있음. `locale -a`로 `en_US.UTF-8` 확인 후, 없으면 `sudo locale-gen en_US.UTF-8`(또는 `sudo dpkg-reconfigure locales`) 실행. 터미널 앱 프로필에서 **한글 지원 폰트**(예: Noto Sans Mono CJK KR, D2Coding) 사용 권장.
 - **Oh My Zsh**  
   - 테마: `robbyrussell`  
   - 기본 에디터: `nvim`
@@ -145,6 +149,7 @@ Tmux에서는 **Prefix(접두키)** 를 먼저 누른 뒤, 그 다음에 한 글
 - **Oh My Zsh**: 없으면 비대화형 설치
 - **Zsh 플러그인**: zsh-autosuggestions, zsh-syntax-highlighting 클론
 - **심볼릭 링크**  
+  - `~/.zshenv` ← `zsh/.zshenv` (로케일/IME)  
   - `~/.zshrc` ← `zsh/.zshrc`  
   - `~/.tmux.conf` ← `tmux/.tmux.conf`  
   - `~/.tmux/statusbar.tmux` ← `tmux/statusbar.tmux`  
@@ -164,6 +169,7 @@ dotfiles/
 ├── README.md           # 이 문서
 ├── install.sh          # 일괄 설치 스크립트
 ├── zsh/
+│   ├── .zshenv         # 로케일 UTF-8 + Linux IME (한글) — 모든 zsh에서 먼저 로드
 │   ├── .zshrc          # Oh My Zsh + 플러그인 + EDITOR
 │   └── aliases.zsh     # OS별 alias (GPU/NPU/Docker/Claude)
 ├── tmux/
