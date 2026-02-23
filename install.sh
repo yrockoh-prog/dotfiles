@@ -149,15 +149,22 @@ if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
     fi
 fi
 
-# bash가 떠도 자동으로 zsh로 넘어가도록 .bashrc에 fallback 추가 (터미널·tmux 새 창 모두 적용)
-BASHRC_MARKER="# dotfiles: exec zsh when bash is interactive"
-if [ -n "$ZSH_PATH" ] && ! grep -q "dotfiles: exec zsh" "$HOME/.bashrc" 2>/dev/null; then
-    echo "" >> "$HOME/.bashrc"
-    echo "$BASHRC_MARKER" >> "$HOME/.bashrc"
-    echo 'if [ -n "$BASH_VERSION" ] && [[ $- == *i* ]]; then' >> "$HOME/.bashrc"
-    echo '  [ -x "'"$ZSH_PATH"'" ] && exec '"$ZSH_PATH"' -l' >> "$HOME/.bashrc"
-    echo "fi" >> "$HOME/.bashrc"
-    echo "🔗 Added zsh launcher to ~/.bashrc (bash → zsh)"
+# bash가 떠도 자동으로 zsh로 넘어가도록 fallback 추가
+# 로그인 셸(Mac 터미널, SSH)은 .bash_profile만 읽음 → 둘 다에 넣어야 함
+add_zsh_launcher() {
+    local file="$1"
+    [ -z "$ZSH_PATH" ] && return 0
+    [ -f "$file" ] && grep -q "dotfiles: exec zsh" "$file" 2>/dev/null && return 0
+    echo "" >> "$file"
+    echo "# dotfiles: exec zsh when bash is interactive" >> "$file"
+    echo 'if [ -n "$BASH_VERSION" ] && [[ $- == *i* ]]; then' >> "$file"
+    printf '  [ -x "%s" ] && exec %s -l\n' "$ZSH_PATH" "$ZSH_PATH" >> "$file"
+    echo "fi" >> "$file"
+    echo "🔗 Added zsh launcher to $file (bash → zsh)"
+}
+if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
+    add_zsh_launcher "$HOME/.bashrc"
+    add_zsh_launcher "$HOME/.bash_profile"
 fi
 
 echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."
