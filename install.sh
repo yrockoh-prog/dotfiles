@@ -168,3 +168,5 @@ if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
 fi
 
 echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."
+echo ""
+echo "💡 Tmux: 이미 실행 중이면 설정이 안 읽힙니다. tmux 안에서 Ctrl+a 누른 뒤 r 로 설정 리로드, 또는 tmux 완전히 종료 후 다시 실행."
