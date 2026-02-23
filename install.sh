@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# sudo로 실행 시 실제 사용자 HOME 사용 (참고: 팀 dotfiles)
+if [[ -n "${SUDO_USER:-}" ]]; then
+    if command -v getent &>/dev/null; then
+        HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    else
+        HOME=$(eval echo "~$SUDO_USER")
+    fi
+    export HOME
+fi
+
 DOTFILES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BACKUP_DIR="$HOME/dotfiles_backup_$(date +%Y%m%d_%H%M%S)"
 
@@ -100,17 +110,24 @@ install_claude() {
 }
 
 # --- 4. 심볼릭 링크 생성 함수 ---
+# dotfiles가 $HOME 아래에 있으면 상대 경로로 링크 (다른 머신/경로에서도 깨지지 않음)
 link_file() {
     local src=$1
     local dest=$2
+    local link_target="$src"
+    if [[ "$DOTFILES_DIR" == "$HOME"/* ]]; then
+        # dotfiles가 $HOME 아래면 상대 경로로 링크 (이동/다른 머신에서도 유지)
+        link_target="${DOTFILES_DIR#$HOME/}/${src#$DOTFILES_DIR/}"
+        link_target="${link_target#/}"
+    fi
     mkdir -p "$(dirname "$dest")"
     if [ -L "$dest" ]; then rm "$dest"; elif [ -f "$dest" ] || [ -d "$dest" ]; then
         echo "   Backing up $dest to $BACKUP_DIR"
         mkdir -p "$BACKUP_DIR"
         mv "$dest" "$BACKUP_DIR"
     fi
-    ln -s "$src" "$dest"
-    echo "🔗 Linked: $src -> $dest"
+    ln -s "$link_target" "$dest"
+    echo "🔗 Linked: $dest -> $link_target"
 }
 
 # --- 실행 로직 ---
@@ -133,6 +150,23 @@ ZSH_CUSTOM=${ZSH_CUSTOM:-~/.oh-my-zsh/custom}
 echo "🔗 Linking config files..."
 link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
 link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
+mkdir -p "$HOME/.tmux"
+# statusbar.tmux: ~/.tmux/ 기준 상대 경로로 링크 (link_file은 $HOME 기준이라 별도 처리)
+if [ -L "$HOME/.tmux/statusbar.tmux" ]; then rm "$HOME/.tmux/statusbar.tmux"; fi
+if [ -f "$HOME/.tmux/statusbar.tmux" ] && [ ! -L "$HOME/.tmux/statusbar.tmux" ]; then
+  mkdir -p "$BACKUP_DIR"
+  mv "$HOME/.tmux/statusbar.tmux" "$BACKUP_DIR/statusbar.tmux" 2>/dev/null || true
+fi
+if [[ "$DOTFILES_DIR" == "$HOME"/* ]]; then
+  ln -s "../${DOTFILES_DIR#$HOME/}/tmux/statusbar.tmux" "$HOME/.tmux/statusbar.tmux"
+else
+  ln -s "$DOTFILES_DIR/tmux/statusbar.tmux" "$HOME/.tmux/statusbar.tmux"
+fi
+echo "🔗 Linked: ~/.tmux/statusbar.tmux -> statusbar.tmux"
+# TPM (Tmux Plugin Manager) — 플러그인 사용 시 필요
+[ -d "$HOME/.tmux/plugins/tpm" ] || git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
+bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null || true
+
 link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
 link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
 
@@ -165,6 +199,20 @@ add_zsh_launcher() {
 if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
     add_zsh_launcher "$HOME/.bashrc"
     add_zsh_launcher "$HOME/.bash_profile"
+fi
+
+# sudo로 실행했을 때 생성된 디렉터리/링크 소유자를 실제 사용자로
+if [[ -n "${SUDO_USER:-}" ]]; then
+    SUDO_GROUP=$(id -gn "$SUDO_USER" 2>/dev/null || true)
+    if [[ -n "$SUDO_GROUP" ]]; then
+        echo "🔧 Fixing ownership for $SUDO_USER..."
+        for dir in "$HOME/.oh-my-zsh" "$HOME/.zplug" "$HOME/.config" "$HOME/.tmux" \
+                   "$HOME/.cache/nvim" "$HOME/.local" "$HOME/.zshrc" "$HOME/.bashrc" \
+                   "$HOME/.bash_profile" "$HOME/.gitconfig" "$HOME/.tmux.conf" \
+                   "$HOME/.config/nvim" "$HOME/CLAUDE.md"; do
+            [[ -e "$dir" ]] && chown -R "$SUDO_USER:$SUDO_GROUP" "$dir" 2>/dev/null || true
+        done
+    fi
 fi
 
 echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."

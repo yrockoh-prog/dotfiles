@@ -48,9 +48,11 @@ Tmux에서는 **Prefix(접두키)** 를 먼저 누른 뒤, 그 다음에 한 글
 
 | 입력 | 의미 | 하는 일 |
 |------|------|----------|
-| **Ctrl+a** 그다음 **&#124;** (세로줄) | 세로 분할 | 화면을 **왼쪽/오른쪽**으로 나눔. 새 팬도 현재 디렉터리 유지. |
-| **Ctrl+a** 그다음 **-** (빼기) | 가로 분할 | 화면을 **위/아래**로 나눔. 새 팬도 현재 디렉터리 유지. |
+| **Ctrl+a** 그다음 **&#124;** 또는 **v** | 세로 분할 | 화면을 **왼쪽/오른쪽**으로 나눔. 새 팬도 현재 디렉터리 유지. |
+| **Ctrl+a** 그다음 **-** 또는 **s** | 가로 분할 | 화면을 **위/아래**로 나눔. 새 팬도 현재 디렉터리 유지. |
+| **Ctrl+a** 그다음 **h/j/k/l** | 팬 이동 | vi 스타일 왼/아래/위/오른쪽. |
 | **Ctrl+a** 그다음 **방향키** | 팬 이동 | 나눠진 구역(팬) 사이로 포커스 이동. |
+| **Ctrl+a** 그다음 **&gt;/&lt;/+/_** | 팬 크기 | 오른/왼/아래/위로 조절. |
 | **Ctrl+a** 그다음 **c** | 새 윈도우 | 새 탭처럼 쓰는 “윈도우” 생성. |
 | **Ctrl+a** 그다음 **0~9** | 윈도우 이동 | 해당 번호의 윈도우(탭)로 이동. |
 | **Ctrl+a** 그다음 **r** | 설정 리로드 | `~/.tmux.conf` 다시 읽기 (단축키·상태바 등 적용). |
@@ -84,17 +86,16 @@ Tmux에서는 **Prefix(접두키)** 를 먼저 누른 뒤, 그 다음에 한 글
 
 ---
 
-#### 상태바 표시
+#### 상태바 (동적)
 
-- **COMMAND**: 지금 Prefix(`Ctrl+a`)를 누른 상태일 때 빨간 배경으로 표시.
-- **COPY**: 복사/스크롤 모드일 때 표시.
-- **ZOOM**: 현재 팬이 확대된 상태일 때 표시.
-- 오른쪽: 현재 시각.
+- **statusbar.tmux** (`~/.tmux/statusbar.tmux`로 링크): 1초 간격으로 갱신되는 동적 상태바.
+- **표시 내용**: 세션명, PREFIX 표시, **CPU 사용률**, **RAM 사용량**, **GPU**(nvidia-smi), **HPU**(hl-smi), **NPU**(npustat), 날짜/시각. (해당 명령이 있으면만 표시)
+- 복사 모드 등은 tmux 기본 표시.
 
 ---
 
-- **기본**: Prefix `Ctrl+a`, 마우스 on, 윈도우/팬 인덱스 1부터, 자동 번호 재정렬.
-- **상태바**: Tokyo Night 스타일.
+- **기본**: Prefix `Ctrl+a`, 마우스 on, vi 모드(`mode-keys vi`), 윈도우/팬 인덱스 1부터, 자동 번호 재정렬.
+- **의존성**: 동적 상태바 색 구간은 `bc`가 있으면 사용 (없어도 동작).
 
 ### 3. Git (`git/`)
 
@@ -146,10 +147,13 @@ Tmux에서는 **Prefix(접두키)** 를 먼저 누른 뒤, 그 다음에 한 글
 - **심볼릭 링크**  
   - `~/.zshrc` ← `zsh/.zshrc`  
   - `~/.tmux.conf` ← `tmux/.tmux.conf`  
+  - `~/.tmux/statusbar.tmux` ← `tmux/statusbar.tmux`  
   - `~/.gitconfig` ← `git/gitconfig`  
   - `~/.config/nvim` ← `nvim`
+- **Tmux**: TPM(Tmux Plugin Manager) 설치 (`~/.tmux/plugins/tpm`) 및 `install_plugins` 실행 — 나중에 .tmux.conf에 플러그인 추가 시 사용.
 - **기존 설정**: 백업 후 링크 (백업 디렉터리: `~/dotfiles_backup_YYYYMMDD_HHMMSS`)
 - **기본 쉘**: zsh로 변경 시도 (`chsh`). 실패 시 `~/.bashrc`와 `~/.bash_profile` 둘 다에 fallback 추가 — **로그인 셸**(Mac 터미널, SSH)은 `.bash_profile`만 읽으므로 둘 다 넣어야 새 터미널·tmux에서 자동으로 zsh 실행됨.
+- **sudo로 실행 시**: 실제 사용자 `HOME` 사용 + 설치 끝에 생성된 디렉터리/링크 소유자를 해당 사용자로 복구 (팀 dotfiles 참고).
 
 ---
 
@@ -163,7 +167,8 @@ dotfiles/
 │   ├── .zshrc          # Oh My Zsh + 플러그인 + EDITOR
 │   └── aliases.zsh     # OS별 alias (GPU/NPU/Docker/Claude)
 ├── tmux/
-│   └── .tmux.conf      # Prefix, 분할, F12 중첩, 상태바
+│   ├── .tmux.conf      # Prefix, 분할, hjkl/리사이즈, F12 중첩, 동적 상태바 로드
+│   └── statusbar.tmux  # 동적 상태바 (CPU, RAM, GPU, HPU, NPU) — ~/.tmux/ 로 링크
 ├── git/
 │   └── gitconfig       # user.name, user.email, credential.helper store
 ├── nvim/
@@ -331,6 +336,6 @@ dotfiles/
 ## 참고
 
 - Neovim 첫 실행 시 Lazy.nvim이 플러그인을 자동 설치합니다.
-- **Tmux 설정이 안 먹을 때**: (1) tmux는 서버가 뜰 때만 `~/.tmux.conf`를 읽습니다. 이미 떠 있으면 **Ctrl+a** 다음 **r** 로 리로드하거나 tmux 완전 종료 후 재실행. (2) 단축키가 안 먹히면 설정 문법 오류일 수 있음 — `tmux -f ~/.tmux.conf new` 로 실행해 보면 에러 메시지가 나옵니다. (`bind \|` / `bind -` 는 따옴표로 감싼 `bind "|"` / `bind "-"` 로 해야 함.)
+- **Tmux 설정이 안 먹을 때**: (1) tmux는 서버가 뜰 때만 `~/.tmux.conf`를 읽습니다. 이미 떠 있으면 **Ctrl+a** 다음 **r** 로 리로드하거나 tmux 완전 종료 후 재실행. (2) 단축키가 안 먹히면 설정 문법 오류일 수 있음 — `tmux -f ~/.tmux.conf new` 로 실행해 보면 에러 메시지가 나옵니다. (3) **링크 깨짐**: `ls -la ~/.tmux.conf` 로 심볼릭 링크 확인. 빨간색/깨진 링크면 dotfiles 디렉터리에서 `./install.sh` 다시 실행하면 됩니다. (설치 스크립트는 dotfiles가 홈 아래 있을 때 상대 경로로 링크해 둠.)
 - Tmux 중첩 사용 시: 로컬에서 **F12** → 원격/도커 Tmux 조작 → 다시 **F12**로 로컬로 복귀합니다.
 - `cauto`는 Claude Code를 권한 무시 모드로 실행합니다. 신뢰할 수 있는 환경에서만 사용하세요.
