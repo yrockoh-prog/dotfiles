@@ -1,0 +1,145 @@
+#!/bin/bash
+set -e
+
+DOTFILES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+BACKUP_DIR="$HOME/dotfiles_backup_$(date +%Y%m%d_%H%M%S)"
+
+# Docker/컨테이너 여부 (chsh 스킵 등에만 사용). Claude는 local/remote/컨테이너 모두 동일하게 설치
+# Claude 스킵은 DOTFILES_SKIP_CLAUDE=1 일 때만
+[ -f /.dockerenv ] || [ -n "${container:-}" ] && IN_CONTAINER=1 || IN_CONTAINER=0
+[ "${DOTFILES_SKIP_CLAUDE:-0}" = "1" ] && SKIP_CLAUDE=1 || true
+
+# --- 1. OS 감지 ---
+get_os() {
+    case "$(uname -s)" in
+        Linux*)     echo "Linux";;
+        Darwin*)    echo "Mac";;
+        *)          echo "Unknown";;
+    esac
+}
+
+OS_TYPE=$(get_os)
+echo "🖥️  Detected OS: $OS_TYPE"
+
+# --- 2. 패키지 설치 ---
+install_packages() {
+    if [ "$OS_TYPE" == "Mac" ]; then
+        if ! command -v brew &> /dev/null; then
+            echo "🍺 Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+        echo "📦 Installing packages (brew)..."
+        brew update
+        # Node.js는 Claude Code 실행을 위해 필수
+        brew install zsh tmux neovim git curl wget ripgrep fd node
+        
+    elif [ "$OS_TYPE" == "Linux" ]; then
+        echo "📦 Installing packages (apt)..."
+        # Node.js 최신 LTS 버전 설치 (Ubuntu 기본 패키지는 구버전일 수 있음)
+        if ! command -v node &> /dev/null; then
+            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+        fi
+        
+        if [ "$EUID" -ne 0 ]; then
+             sudo apt-get update && sudo apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip
+        else
+             apt-get update && apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip
+        fi
+    fi
+}
+
+# --- 2-1. pip 패키지 (GPU 모니터링 등) ---
+install_pip_packages() {
+    echo "🐍 Installing pip packages..."
+    if command -v pip3 &> /dev/null; then
+        pip3 install --user gpustat 2>/dev/null || sudo pip3 install gpustat
+    elif command -v pip &> /dev/null; then
+        pip install --user gpustat 2>/dev/null || sudo pip install gpustat
+    else
+        echo "   Skipping gpustat (pip not found). Install python3-pip and re-run."
+    fi
+}
+
+# --- 3. Claude Code 설정 (DOTFILES_SKIP_CLAUDE=1 일 때만 생략) ---
+install_claude() {
+    if [ "${SKIP_CLAUDE:-0}" = "1" ]; then
+        echo "🤖 Skipping Claude Code (DOTFILES_SKIP_CLAUDE=1)."
+        return 0
+    fi
+    echo "🤖 Setting up Claude Code..."
+    
+    # npm으로 Claude Code 전역 설치
+    if ! command -v claude &> /dev/null; then
+        echo "   Installing @anthropic-ai/claude-code..."
+        sudo npm install -g @anthropic-ai/claude-code
+    fi
+
+    # PATH에 로컬 bin 추가 (claude가 여기 설치될 수 있음)
+    export PATH="$HOME/.local/bin:$PATH"
+
+    # CLAUDE.md 심볼릭 링크 (홈 디렉토리에 두어 전역 컨텍스트로 사용)
+    link_file "$DOTFILES_DIR/caludecode/CLAUDE.md" "$HOME/CLAUDE.md"
+
+    # Oh My Claudecode 플러그인 (팀 동료 dotfiles 참조: https://github.com/seongwoongcho/dotfiles)
+    echo "   Setting up oh-my-claudecode plugin..."
+    claude plugin marketplace add https://github.com/Yeachan-Heo/oh-my-claudecode 2>/dev/null || true
+    claude plugin install oh-my-claudecode 2>/dev/null || true
+    command -v omc &>/dev/null && omc update 2>/dev/null || true
+
+    # 공식 LSP 플러그인 (선택)
+    echo "   Adding Claude Code LSP plugins..."
+    claude plugin marketplace add anthropics/claude-plugins-official 2>/dev/null || true
+    for pkg in typescript-lsp@claude-plugins-official pyright-lsp@claude-plugins-official; do
+        claude plugin install "$pkg" 2>/dev/null || true
+    done
+
+    # Superpowers 플러그인
+    echo "   Installing superpowers plugin..."
+    claude plugin marketplace add obra/superpowers-marketplace 2>/dev/null || true
+    claude plugin install superpowers@superpowers-marketplace 2>/dev/null || true
+}
+
+# --- 4. 심볼릭 링크 생성 함수 ---
+link_file() {
+    local src=$1
+    local dest=$2
+    mkdir -p "$(dirname "$dest")"
+    if [ -L "$dest" ]; then rm "$dest"; elif [ -f "$dest" ] || [ -d "$dest" ]; then
+        echo "   Backing up $dest to $BACKUP_DIR"
+        mkdir -p "$BACKUP_DIR"
+        mv "$dest" "$BACKUP_DIR"
+    fi
+    ln -s "$src" "$dest"
+    echo "🔗 Linked: $src -> $dest"
+}
+
+# --- 실행 로직 ---
+install_packages
+install_pip_packages
+install_claude
+
+# Oh My Zsh 설치
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
+    echo "🎨 Installing Oh My Zsh..."
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+fi
+
+# Zsh 플러그인 설치
+ZSH_CUSTOM=${ZSH_CUSTOM:-~/.oh-my-zsh/custom}
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM}/plugins/zsh-autosuggestions
+[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM}/plugins/zsh-syntax-highlighting
+
+# 설정 파일 연결
+echo "🔗 Linking config files..."
+link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
+link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
+link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
+link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
+
+# 쉘 변경 (컨테이너 안에서는 보통 생략)
+if [ "$IN_CONTAINER" = "0" ] && [ "$SHELL" != "$(which zsh 2>/dev/null)" ]; then
+    echo "🐚 Changing default shell to zsh..."
+    chsh -s "$(which zsh)" 2>/dev/null || true
+fi
+
+echo "✅ Installation Complete! Please restart your terminal (or run 'exec zsh')."
