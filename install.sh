@@ -136,10 +136,28 @@ link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
 link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
 
-# 쉘 변경 (컨테이너 안에서는 보통 생략)
-if [ "$IN_CONTAINER" = "0" ] && [ "$SHELL" != "$(which zsh 2>/dev/null)" ]; then
-    echo "🐚 Changing default shell to zsh..."
-    chsh -s "$(which zsh)" 2>/dev/null || true
+# 기본 쉘을 zsh로 변경 시도 (실패해도 아래 .bashrc fallback으로 터미널/tmux에서 zsh 실행됨)
+ZSH_PATH=$(command -v zsh 2>/dev/null)
+if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
+    if [ "$SHELL" != "$ZSH_PATH" ]; then
+        echo "🐚 Changing default shell to zsh..."
+        if chsh -s "$ZSH_PATH" 2>/dev/null; then
+            echo "   Default shell set to zsh."
+        else
+            echo "   chsh failed (권한/환경 제한). .bashrc에 fallback 추가함 — 새 터미널/tmux에서 자동으로 zsh 실행됩니다."
+        fi
+    fi
 fi
 
-echo "✅ Installation Complete! Please restart your terminal (or run 'exec zsh')."
+# bash가 떠도 자동으로 zsh로 넘어가도록 .bashrc에 fallback 추가 (터미널·tmux 새 창 모두 적용)
+BASHRC_MARKER="# dotfiles: exec zsh when bash is interactive"
+if [ -n "$ZSH_PATH" ] && ! grep -q "dotfiles: exec zsh" "$HOME/.bashrc" 2>/dev/null; then
+    echo "" >> "$HOME/.bashrc"
+    echo "$BASHRC_MARKER" >> "$HOME/.bashrc"
+    echo 'if [ -n "$BASH_VERSION" ] && [[ $- == *i* ]]; then' >> "$HOME/.bashrc"
+    echo '  [ -x "'"$ZSH_PATH"'" ] && exec '"$ZSH_PATH"' -l' >> "$HOME/.bashrc"
+    echo "fi" >> "$HOME/.bashrc"
+    echo "🔗 Added zsh launcher to ~/.bashrc (bash → zsh)"
+fi
+
+echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."

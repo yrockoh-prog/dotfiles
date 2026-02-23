@@ -148,7 +148,7 @@ Tmux에서는 **Prefix(접두키)** 를 먼저 누른 뒤, 그 다음에 한 글
   - `~/.gitconfig` ← `git/gitconfig`  
   - `~/.config/nvim` ← `nvim`
 - **기존 설정**: 백업 후 링크 (백업 디렉터리: `~/dotfiles_backup_YYYYMMDD_HHMMSS`)
-- **기본 쉘**: zsh로 변경 (`chsh`)
+- **기본 쉘**: zsh로 변경 시도 (`chsh`). 실패 시(권한/환경 제한) `~/.bashrc`에 fallback 추가 — 새 터미널·tmux 창에서 bash가 떠도 자동으로 `exec zsh` 되어 zsh로 들어감.
 
 ---
 
