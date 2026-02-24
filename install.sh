@@ -117,6 +117,10 @@ install_claude() {
     # CLAUDE.md 심볼릭 링크 (홈 디렉토리에 두어 전역 컨텍스트로 사용)
     link_file "$DOTFILES_DIR/caludecode/CLAUDE.md" "$HOME/CLAUDE.md"
 
+    # settings.json 심볼릭 링크
+    mkdir -p "$HOME/.claude"
+    link_file "$DOTFILES_DIR/caludecode/settings.json" "$HOME/.claude/settings.json"
+
     # Oh My Claudecode 플러그인 (팀 동료 dotfiles 참조: https://github.com/seongwoongcho/dotfiles)
     echo "   Setting up oh-my-claudecode plugin..."
     claude plugin marketplace add https://github.com/Yeachan-Heo/oh-my-claudecode 2>/dev/null || true

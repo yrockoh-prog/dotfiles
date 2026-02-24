@@ -36,20 +36,10 @@ alias dps='docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}
 alias dexec='docker exec -it'
 
 # --- 5. Claude Code ---
-# root(도커 등)에서는 --dangerously-skip-permissions 불가 → 플래그 없이 실행 (동작마다 승인 필요)
-claude_run() {
-    if [ "$(id -u)" -eq 0 ]; then
-        command claude "$@"
-    else
-        IS_SANDBOX=1 command claude --dangerously-skip-permissions "$@"
-    fi
-}
 claude() {
-    omc update 2>/dev/null; claude_run "$@"
+    omc update 2>/dev/null; IS_SANDBOX=1 command claude --dangerously-skip-permissions "$@"
 }
-cauto() {
-    claude_run "$@"
-}
+alias cauto='IS_SANDBOX=1 command claude --dangerously-skip-permissions'
 
 # 로컬에서 단축키로 Claude Code 업데이트
 function claude_update() {
