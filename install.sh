@@ -77,9 +77,17 @@ install_pip_packages() {
     fi
     echo "🐍 Installing pip packages..."
     if command -v pip3 &> /dev/null; then
-        pip3 install --user gpustat 2>/dev/null || sudo pip3 install gpustat
+        if [ "$EUID" -eq 0 ] || [ "$IN_CONTAINER" = "1" ]; then
+            pip3 install gpustat 2>/dev/null || true
+        else
+            pip3 install --user gpustat 2>/dev/null || sudo pip3 install gpustat
+        fi
     elif command -v pip &> /dev/null; then
-        pip install --user gpustat 2>/dev/null || sudo pip install gpustat
+        if [ "$EUID" -eq 0 ] || [ "$IN_CONTAINER" = "1" ]; then
+            pip install gpustat 2>/dev/null || true
+        else
+            pip install --user gpustat 2>/dev/null || sudo pip install gpustat
+        fi
     else
         echo "   Skipping gpustat (pip not found). Install python3-pip and re-run."
     fi
@@ -93,10 +101,10 @@ install_claude() {
     fi
     echo "🤖 Setting up Claude Code..."
     
-    # npm으로 Claude Code 전역 설치 (컨테이너 비 root면 sudo 없이)
+    # npm으로 Claude Code 전역 설치 (root 또는 컨테이너면 sudo 없이)
     if ! command -v claude &> /dev/null; then
         echo "   Installing @anthropic-ai/claude-code..."
-        if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -ne 0 ]; then
+        if [ "$EUID" -eq 0 ] || [ "$IN_CONTAINER" = "1" ]; then
             npm install -g @anthropic-ai/claude-code
         else
             sudo npm install -g @anthropic-ai/claude-code
@@ -235,13 +243,13 @@ if [[ -n "${SUDO_USER:-}" ]]; then
     fi
 fi
 
-# --- 컨테이너 root 전용: dev 사용자 생성 후 dotfiles 연결 (claude --dangerously-skip-permissions 우회)
+# --- 컨테이너 root 전용: 별도 사용자(dev) 생성 + dotfiles 연결 → Claude만 그 사용자로 실행해 --dangerously-skip-permissions 가능
 CONTAINER_CLAUDE_USER="${CONTAINER_CLAUDE_USER:-dev}"
 if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -eq 0 ]; then
     if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
-        echo "👤 User $CONTAINER_CLAUDE_USER already exists (for Claude non-root run)."
+        echo "👤 User $CONTAINER_CLAUDE_USER already exists (Claude runs as this user for --dangerously-skip-permissions)."
     else
-        echo "👤 Creating user $CONTAINER_CLAUDE_USER for Claude (--dangerously-skip-permissions in container as root)."
+        echo "👤 Creating user $CONTAINER_CLAUDE_USER (container stays root; Claude will run as this user)."
         useradd -m -s /bin/zsh "$CONTAINER_CLAUDE_USER" 2>/dev/null || true
     fi
     if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then

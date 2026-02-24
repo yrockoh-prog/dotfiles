@@ -327,4 +327,4 @@ dotfiles/
 - Neovim 첫 실행 시 Lazy.nvim이 플러그인을 자동 설치합니다.
 - **Tmux 설정이 안 먹을 때**: (1) tmux는 서버가 뜰 때만 `~/.tmux.conf`를 읽습니다. 이미 떠 있으면 **Ctrl+a** 다음 **r** 로 리로드하거나 tmux 완전 종료 후 재실행. (2) 단축키가 안 먹히면 설정 문법 오류일 수 있음 — `tmux -f ~/.tmux.conf new` 로 실행해 보면 에러 메시지가 나옵니다. (3) **링크 깨짐**: `ls -la ~/.tmux.conf` 로 심볼릭 링크 확인. 빨간색/깨진 링크면 dotfiles 디렉터리에서 `./install.sh` 다시 실행하면 됩니다. (설치 스크립트는 dotfiles가 홈 아래 있을 때 상대 경로로 링크해 둠.)
 - Tmux 중첩 사용 시: 로컬에서 **F12** → 원격/도커 Tmux 조작 → 다시 **F12**로 로컬로 복귀합니다.
-- **Claude Code 권한 무시**: `claude`/`cauto`는 `--dangerously-skip-permissions`로 실행합니다. **root**(예: Docker에서 root로 들어가는 경우)에서는 보안상 이 옵션을 쓸 수 없어, 컨테이너 안에서 root로 `install.sh`를 실행하면 **dev** 사용자가 생성되고, root가 `claude`/`cauto`를 치면 **dev**로 위임 실행되어 권한 무시 모드가 동작합니다. 사용자 이름은 `CONTAINER_CLAUDE_USER=이름`으로 변경 가능합니다.
+- **Claude Code 권한 무시 (Docker 설계 목표)**: 컨테이너는 **root로 두고**, Claude만 **별도 사용자(dev)** 로 실행해 `--dangerously-skip-permissions`를 쓰는 것이 목표입니다. root에서는 해당 옵션이 막히므로, `install.sh`가 **dev** 사용자를 만들고 dotfiles를 연결해 두며, root가 `claude`/`cauto`를 치면 **dev**로 위임 실행됩니다. 사용자 이름은 `CONTAINER_CLAUDE_USER=이름`으로 변경 가능합니다.

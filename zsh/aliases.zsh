@@ -36,8 +36,7 @@ alias dps='docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}
 alias dexec='docker exec -it'
 
 # --- 5. Claude Code ---
-# root(예: Docker 컨테이너)에서는 --dangerously-skip-permissions 사용 불가 → 조건부 실행
-# 컨테이너 root일 때: install.sh가 만든 dev 사용자로 위임하면 권한 무시 모드 사용 가능
+# 목표: 컨테이너는 root로 두고, Claude만 별도 사용자(dev)로 실행 → --dangerously-skip-permissions 사용 가능
 CONTAINER_CLAUDE_USER="${CONTAINER_CLAUDE_USER:-dev}"
 claude_run() {
     if [ "$(id -u)" -eq 0 ]; then
