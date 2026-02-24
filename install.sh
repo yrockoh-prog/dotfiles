@@ -33,6 +33,12 @@ echo "🖥️  Detected OS: $OS_TYPE"
 
 # --- 2. 패키지 설치 ---
 install_packages() {
+    # 컨테이너 안에서 비 root면 apt/brew 스킵 (이미지는 빌드 시 root로 패키지 설치됨)
+    if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -ne 0 ]; then
+        echo "📦 Skipping system packages (container, non-root). 이미지 빌드 시 설치된 패키지를 사용합니다."
+        return 0
+    fi
+
     if [ "$OS_TYPE" == "Mac" ]; then
         if ! command -v brew &> /dev/null; then
             echo "🍺 Installing Homebrew..."
@@ -47,7 +53,7 @@ install_packages() {
         echo "📦 Installing packages (apt)..."
         # Node.js 최신 LTS 버전 설치 (Ubuntu 기본 패키지는 구버전일 수 있음)
         if ! command -v node &> /dev/null; then
-            curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+            [ "$EUID" -eq 0 ] && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - || curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
         fi
         
         if [ "$EUID" -ne 0 ]; then
@@ -60,6 +66,15 @@ install_packages() {
 
 # --- 2-1. pip 패키지 (GPU 모니터링 등) ---
 install_pip_packages() {
+    # 컨테이너 비 root: --user만 시도 (sudo 없음)
+    if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -ne 0 ]; then
+        if command -v pip3 &> /dev/null; then
+            pip3 install --user gpustat 2>/dev/null || true
+        elif command -v pip &> /dev/null; then
+            pip install --user gpustat 2>/dev/null || true
+        fi
+        return 0
+    fi
     echo "🐍 Installing pip packages..."
     if command -v pip3 &> /dev/null; then
         pip3 install --user gpustat 2>/dev/null || sudo pip3 install gpustat
@@ -78,10 +93,14 @@ install_claude() {
     fi
     echo "🤖 Setting up Claude Code..."
     
-    # npm으로 Claude Code 전역 설치
+    # npm으로 Claude Code 전역 설치 (컨테이너 비 root면 sudo 없이)
     if ! command -v claude &> /dev/null; then
         echo "   Installing @anthropic-ai/claude-code..."
-        sudo npm install -g @anthropic-ai/claude-code
+        if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -ne 0 ]; then
+            npm install -g @anthropic-ai/claude-code
+        else
+            sudo npm install -g @anthropic-ai/claude-code
+        fi
     fi
 
     # PATH에 로컬 bin 추가 (claude가 여기 설치될 수 있음)
@@ -213,6 +232,44 @@ if [[ -n "${SUDO_USER:-}" ]]; then
                    "$HOME/.config/nvim" "$HOME/CLAUDE.md"; do
             [[ -e "$dir" ]] && chown -R "$SUDO_USER:$SUDO_GROUP" "$dir" 2>/dev/null || true
         done
+    fi
+fi
+
+# --- 컨테이너 root 전용: dev 사용자 생성 후 dotfiles 연결 (claude --dangerously-skip-permissions 우회)
+CONTAINER_CLAUDE_USER="${CONTAINER_CLAUDE_USER:-dev}"
+if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -eq 0 ]; then
+    if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
+        echo "👤 User $CONTAINER_CLAUDE_USER already exists (for Claude non-root run)."
+    else
+        echo "👤 Creating user $CONTAINER_CLAUDE_USER for Claude (--dangerously-skip-permissions in container as root)."
+        useradd -m -s /bin/zsh "$CONTAINER_CLAUDE_USER" 2>/dev/null || true
+    fi
+    if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
+        DEV_HOME="$(getent passwd "$CONTAINER_CLAUDE_USER" | cut -d: -f6)"
+        BACKUP_DIR_DEV="$DEV_HOME/dotfiles_backup_$(date +%Y%m%d_%H%M%S)"
+        export HOME="$DEV_HOME"
+        export BACKUP_DIR="$BACKUP_DIR_DEV"
+        mkdir -p "$HOME/.tmux" "$HOME/.config"
+        [ ! -d "$HOME/.oh-my-zsh" ] && sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        ZSH_CUSTOM="${HOME}/.oh-my-zsh/custom"
+        [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
+        [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
+        link_file "$DOTFILES_DIR/zsh/.zshenv" "$HOME/.zshenv"
+        link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
+        link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
+        [ -L "$HOME/.tmux/statusbar.tmux" ] && rm "$HOME/.tmux/statusbar.tmux"
+        [ -f "$HOME/.tmux/statusbar.tmux" ] && [ ! -L "$HOME/.tmux/statusbar.tmux" ] && mkdir -p "$BACKUP_DIR_DEV" && mv "$HOME/.tmux/statusbar.tmux" "$BACKUP_DIR_DEV/" 2>/dev/null || true
+        if [[ "$DOTFILES_DIR" == "$DEV_HOME"/* ]]; then
+            ln -sf "../${DOTFILES_DIR#$DEV_HOME/}/tmux/statusbar.tmux" "$HOME/.tmux/statusbar.tmux" 2>/dev/null || true
+        else
+            ln -sf "$DOTFILES_DIR/tmux/statusbar.tmux" "$HOME/.tmux/statusbar.tmux" 2>/dev/null || true
+        fi
+        [ -d "$HOME/.tmux/plugins/tpm" ] || git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
+        link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
+        link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
+        link_file "$DOTFILES_DIR/caludecode/CLAUDE.md" "$HOME/CLAUDE.md"
+        chown -R "$CONTAINER_CLAUDE_USER:$CONTAINER_CLAUDE_USER" "$DEV_HOME" 2>/dev/null || true
+        echo "   Dotfiles linked for $CONTAINER_CLAUDE_USER. Run 'claude' or 'cauto' as root → runs as $CONTAINER_CLAUDE_USER with --dangerously-skip-permissions."
     fi
 fi
 

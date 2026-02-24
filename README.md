@@ -295,26 +295,9 @@ dotfiles/
    - 호스트(원격 서버)의 `~/dotfiles`를 컨테이너에 마운트해서 쓰거나,  
    - 먼저 `apt update && apt install -y git curl` 로 의존성을 설치한 뒤 위 2번을 반복합니다.
 
-#### 방법 B: Dockerfile로 이미지에 dotfiles 포함 (재사용 권장)
+#### 방법 B: 컨테이너가 이미 있는 경우
 
-1. **원격 서버(또는 로컬)에 Dockerfile**을 만듭니다.  
-   (아래는 root 사용자 기준. 일반 사용자로 쓰려면 USER를 추가해 사용하세요.)
-
-   ```dockerfile
-   FROM ubuntu:22.04
-   RUN apt-get update && apt-get install -y git curl
-   RUN git clone <저장소 URL> /root/dotfiles && /root/dotfiles/install.sh
-   ENTRYPOINT ["zsh", "-l"]
-   ```
-
-2. **이미지 빌드 후 컨테이너 실행**
-
-   ```bash
-   docker build -t my-dev .
-   docker run -it my-dev
-   ```
-
-   들어가면 이미 zsh + dotfiles가 적용된 상태입니다.
+이미지 빌드는 하지 않고, **이미 떠 있는 컨테이너**에 들어가서 방법 A처럼 클론 후 `./install.sh`만 하면 됩니다. 컨테이너가 **root**로 떠 있으면 `claude`/`cauto` 권한 무시는 아래 참고의 **dev 우회**로 사용할 수 있습니다.
 
 ---
 
@@ -324,7 +307,7 @@ dotfiles/
 |------|--------|
 | Local | `git clone ... ~/dotfiles && cd ~/dotfiles && ./install.sh && exec zsh` |
 | Remote | SSH 접속 후 위와 동일하게 클론 → `./install.sh` → `exec zsh` |
-| Docker | 컨테이너 안에서 클론 → `./install.sh` → `exec zsh` (또는 Dockerfile에서 RUN으로 실행) |
+| Docker | 컨테이너 안에서 클론 → `./install.sh` → `exec zsh` |
 
 - **Claude만 빼고 설치**: 어느 환경이든 `DOTFILES_SKIP_CLAUDE=1 ./install.sh`
 
@@ -344,4 +327,4 @@ dotfiles/
 - Neovim 첫 실행 시 Lazy.nvim이 플러그인을 자동 설치합니다.
 - **Tmux 설정이 안 먹을 때**: (1) tmux는 서버가 뜰 때만 `~/.tmux.conf`를 읽습니다. 이미 떠 있으면 **Ctrl+a** 다음 **r** 로 리로드하거나 tmux 완전 종료 후 재실행. (2) 단축키가 안 먹히면 설정 문법 오류일 수 있음 — `tmux -f ~/.tmux.conf new` 로 실행해 보면 에러 메시지가 나옵니다. (3) **링크 깨짐**: `ls -la ~/.tmux.conf` 로 심볼릭 링크 확인. 빨간색/깨진 링크면 dotfiles 디렉터리에서 `./install.sh` 다시 실행하면 됩니다. (설치 스크립트는 dotfiles가 홈 아래 있을 때 상대 경로로 링크해 둠.)
 - Tmux 중첩 사용 시: 로컬에서 **F12** → 원격/도커 Tmux 조작 → 다시 **F12**로 로컬로 복귀합니다.
-- `cauto`는 Claude Code를 권한 무시 모드로 실행합니다. 신뢰할 수 있는 환경에서만 사용하세요.
+- **Claude Code 권한 무시**: `claude`/`cauto`는 `--dangerously-skip-permissions`로 실행합니다. **root**(예: Docker에서 root로 들어가는 경우)에서는 보안상 이 옵션을 쓸 수 없어, 컨테이너 안에서 root로 `install.sh`를 실행하면 **dev** 사용자가 생성되고, root가 `claude`/`cauto`를 치면 **dev**로 위임 실행되어 권한 무시 모드가 동작합니다. 사용자 이름은 `CONTAINER_CLAUDE_USER=이름`으로 변경 가능합니다.

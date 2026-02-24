@@ -36,11 +36,29 @@ alias dps='docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}
 alias dexec='docker exec -it'
 
 # --- 5. Claude Code ---
-# 기본 실행: OMC 설정 동기화 후 샌드박스 + 권한 무시 모드로 실행
-alias claude='omc update && IS_SANDBOX=1 command claude --dangerously-skip-permissions'
-
-# 권한 무시만 (omc update 없이 빠르게 실행할 때)
-alias cauto='IS_SANDBOX=1 command claude --dangerously-skip-permissions'
+# root(예: Docker 컨테이너)에서는 --dangerously-skip-permissions 사용 불가 → 조건부 실행
+# 컨테이너 root일 때: install.sh가 만든 dev 사용자로 위임하면 권한 무시 모드 사용 가능
+CONTAINER_CLAUDE_USER="${CONTAINER_CLAUDE_USER:-dev}"
+claude_run() {
+    if [ "$(id -u)" -eq 0 ]; then
+        if [ -f /.dockerenv ] || [ -n "${container:-}" ]; then
+            if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
+                dev_home="$(getent passwd "$CONTAINER_CLAUDE_USER" | cut -d: -f6)"
+                sudo -u "$CONTAINER_CLAUDE_USER" env HOME="$dev_home" IS_SANDBOX=1 command claude --dangerously-skip-permissions "$@"
+                return
+            fi
+        fi
+        command claude "$@"
+    else
+        IS_SANDBOX=1 command claude --dangerously-skip-permissions "$@"
+    fi
+}
+claude() {
+    omc update 2>/dev/null; claude_run "$@"
+}
+cauto() {
+    claude_run "$@"
+}
 
 # 로컬에서 단축키로 Claude Code 업데이트
 function claude_update() {
