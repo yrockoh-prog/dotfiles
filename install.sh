@@ -229,21 +229,38 @@ if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
     add_zsh_launcher "$HOME/.bash_profile"
 fi
 
+# 컨테이너에서 en_US.UTF-8 로케일 생성 시도 (없으면 setlocale 경고 발생)
+if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -eq 0 ] && [ "$OS_TYPE" = "Linux" ]; then
+    if ! locale -a 2>/dev/null | grep -q en_US.UTF-8; then
+        echo "🌐 Generating locale en_US.UTF-8 (한글/UTF-8)..."
+        (apt-get update -qq && apt-get install -y -qq locales 2>/dev/null) || true
+        (sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen) || true
+        locale-gen en_US.UTF-8 2>/dev/null || true
+        update-locale LANG=en_US.UTF-8 2>/dev/null || true
+    fi
+fi
+# 사용할 UTF-8 로케일: en_US.UTF-8 있으면 사용, 없으면 C.UTF-8 (대부분 이미지에 있음)
+UTF8_LOCALE="C.UTF-8"
+if locale -a 2>/dev/null | grep -qx en_US.UTF-8; then
+    UTF8_LOCALE="en_US.UTF-8"
+fi
+
 # UTF-8 로케일: bash/tmux 등에서도 한글 깨짐 방지 (도커 등에서 bash로 들어오면 .zshenv가 안 읽힘)
 add_utf8_to_bash() {
     local home_dir="${1:-$HOME}"
     local bashrc="$home_dir/.bashrc"
     local bash_profile="$home_dir/.bash_profile"
     local marker="dotfiles: UTF-8 locale"
+    local loc="${UTF8_LOCALE:-C.UTF-8}"
     for f in "$bashrc" "$bash_profile"; do
         [ -f "$f" ] && grep -q "$marker" "$f" 2>/dev/null && continue
         touch "$f" 2>/dev/null || true
         echo "" >> "$f"
         echo "# $marker (한글)" >> "$f"
-        echo 'export LANG=en_US.UTF-8' >> "$f"
-        echo 'export LC_ALL=en_US.UTF-8' >> "$f"
-        echo 'export LC_CTYPE=en_US.UTF-8' >> "$f"
-        echo "   UTF-8 locale added to $f"
+        echo "export LANG=$loc" >> "$f"
+        echo "export LC_ALL=$loc" >> "$f"
+        echo "export LC_CTYPE=$loc" >> "$f"
+        echo "   UTF-8 locale ($loc) added to $f"
     done
 }
 add_utf8_to_bash "$HOME"
@@ -304,4 +321,4 @@ fi
 echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."
 echo ""
 echo "💡 Tmux: 이미 실행 중이면 설정이 안 읽힙니다. tmux 안에서 Ctrl+a 누른 뒤 r 로 설정 리로드, 또는 tmux 완전히 종료 후 다시 실행."
-echo "💡 Docker에서 한글 깨짐: bash로 들어왔으면 위에서 .bashrc/.bash_profile에 UTF-8을 넣었음. 새 터미널을 열거나 source ~/.bashrc 후 tmux를 다시 띄우세요. 로케일이 없으면 sudo locale-gen en_US.UTF-8 또는 이미지에 해당 로케일이 있는지 확인하세요."
+echo "💡 Docker에서 'cannot change locale (en_US.UTF-8)' 나오면: 위에서 가능한 로케일(C.UTF-8 또는 en_US.UTF-8)을 썼음. 여전히 나오면 .bashrc/.zshenv에서 en_US.UTF-8을 C.UTF-8로 바꾸고 source ~/.bashrc 하세요."
