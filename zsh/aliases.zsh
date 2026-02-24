@@ -36,17 +36,9 @@ alias dps='docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}
 alias dexec='docker exec -it'
 
 # --- 5. Claude Code ---
-# 목표: 컨테이너는 root로 두고, Claude만 별도 사용자(dev)로 실행 → --dangerously-skip-permissions 사용 가능
-CONTAINER_CLAUDE_USER="${CONTAINER_CLAUDE_USER:-dev}"
+# root(도커 등)에서는 --dangerously-skip-permissions 불가 → 플래그 없이 실행 (동작마다 승인 필요)
 claude_run() {
     if [ "$(id -u)" -eq 0 ]; then
-        if [ -f /.dockerenv ] || [ -n "${container:-}" ]; then
-            if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
-                dev_home="$(getent passwd "$CONTAINER_CLAUDE_USER" | cut -d: -f6)"
-                sudo -u "$CONTAINER_CLAUDE_USER" env HOME="$dev_home" IS_SANDBOX=1 command claude --dangerously-skip-permissions "$@"
-                return
-            fi
-        fi
         command claude "$@"
     else
         IS_SANDBOX=1 command claude --dangerously-skip-permissions "$@"
