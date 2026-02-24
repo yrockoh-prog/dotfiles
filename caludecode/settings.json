@@ -1,7 +1,7 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "/root/.nvm/versions/node/v24.13.0/bin/node /root/.claude/hud/omc-hud.mjs"
+    "command": "\"/root/.nvm/versions/node/v24.13.0/bin/node\" \"/root/.claude/hud/omc-hud.mjs\""
   },
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true,
