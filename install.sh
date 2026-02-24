@@ -198,21 +198,8 @@ bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null || true
 link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
 link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
 
-# 기본 쉘을 zsh로 변경 시도 (실패해도 아래 .bashrc fallback으로 터미널/tmux에서 zsh 실행됨)
+# 기본 쉘을 zsh로 변경 시도 (컨테이너 포함; 실패해도 아래 .bashrc fallback으로 bash → zsh)
 ZSH_PATH=$(command -v zsh 2>/dev/null)
-if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
-    if [ "$SHELL" != "$ZSH_PATH" ]; then
-        echo "🐚 Changing default shell to zsh..."
-        if chsh -s "$ZSH_PATH" 2>/dev/null; then
-            echo "   Default shell set to zsh."
-        else
-            echo "   chsh failed (권한/환경 제한). .bashrc에 fallback 추가함 — 새 터미널/tmux에서 자동으로 zsh 실행됩니다."
-        fi
-    fi
-fi
-
-# bash가 떠도 자동으로 zsh로 넘어가도록 fallback 추가
-# 로그인 셸(Mac 터미널, SSH)은 .bash_profile만 읽음 → 둘 다에 넣어야 함
 add_zsh_launcher() {
     local file="$1"
     [ -z "$ZSH_PATH" ] && return 0
@@ -224,7 +211,15 @@ add_zsh_launcher() {
     echo "fi" >> "$file"
     echo "🔗 Added zsh launcher to $file (bash → zsh)"
 }
-if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
+if [ -n "$ZSH_PATH" ]; then
+    if [ "$SHELL" != "$ZSH_PATH" ]; then
+        echo "🐚 Changing default shell to zsh..."
+        if chsh -s "$ZSH_PATH" 2>/dev/null; then
+            echo "   Default shell set to zsh."
+        else
+            echo "   chsh skipped or failed. .bashrc fallback으로 bash 실행 시 자동으로 zsh로 넘어갑니다."
+        fi
+    fi
     add_zsh_launcher "$HOME/.bashrc"
     add_zsh_launcher "$HOME/.bash_profile"
 fi

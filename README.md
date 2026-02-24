@@ -312,7 +312,7 @@ dotfiles/
    cd /workspace && git clone <저장소 URL> dotfiles && cd dotfiles && ./install.sh && exec zsh
    ```
 
-   그러면 `~`는 `/workspace`가 되고, `.zshrc`, `.tmux.conf` 등도 `/workspace` 아래에 링크되며, 컨테이너를 다시 띄워도 같은 볼륨이면 설정이 유지됩니다.
+   그러면 `~`는 `/workspace`가 되고, `.zshrc`, `.tmux.conf` 등도 `/workspace` 아래에 링크되며, 컨테이너를 다시 띄워도 같은 볼륨이면 설정이 유지됩니다. `install.sh` 실행 시 **기본 셸을 zsh로 바꾸고** `.bashrc`에 "bash가 떠도 곧바로 zsh로 전환"하는 코드를 넣어 두므로, `docker exec -it`로 들어가면 bash가 잠깐 뜬 뒤 자동으로 zsh로 넘어갑니다.
 
 #### 방법 B: 컨테이너가 이미 있는 경우
 
