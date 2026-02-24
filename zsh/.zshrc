@@ -15,8 +15,12 @@ export NVM_DIR="$HOME/.nvm"
 # 기본 에디터
 export EDITOR='nvim'
 
-# 커스텀 Alias 로드 (클론 경로가 ~/dotfiles 또는 ~/.dotfiles 모두 지원)
-if [ -f "$HOME/dotfiles/zsh/aliases.zsh" ]; then
+# 커스텀 Alias 로드 (심볼릭 링크를 따라가서 dotfiles 위치 자동 감지)
+_aliases_dir="${HOME}/.zshrc"
+_aliases_dir="${_aliases_dir:A:h}"  # :A resolves symlinks, :h gets dirname
+if [ -f "$_aliases_dir/aliases.zsh" ]; then
+    source "$_aliases_dir/aliases.zsh"
+elif [ -f "$HOME/dotfiles/zsh/aliases.zsh" ]; then
     source "$HOME/dotfiles/zsh/aliases.zsh"
 elif [ -f "$HOME/.dotfiles/zsh/aliases.zsh" ]; then
     source "$HOME/.dotfiles/zsh/aliases.zsh"

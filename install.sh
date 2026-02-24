@@ -57,10 +57,14 @@ install_packages() {
         fi
         
         if [ "$EUID" -ne 0 ]; then
-             sudo apt-get update && sudo apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip
+             sudo apt-get update && sudo apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip \
+                 fonts-noto-cjk fontconfig
         else
-             apt-get update && apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip
+             apt-get update && apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip \
+                 fonts-noto-cjk fontconfig
         fi
+        # 폰트 캐시 갱신 (한글/CJK 폰트 즉시 사용 가능하도록)
+        fc-cache -f 2>/dev/null || true
     fi
 }
 
