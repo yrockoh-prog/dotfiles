@@ -5,10 +5,12 @@
 set -e
 set -o pipefail
 
+# 실행 사용자 홈 기준 (dev 등 별도 사용자에서도 동작)
 cwd="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+statusbar_script="${STATUSBAR_SCRIPT:-$HOME/.tmux/statusbar.tmux}"
 
 main() {
-  tmux set-hook -g client-resized "run-shell '~/.tmux/statusbar.tmux'"
+  tmux set-hook -g client-resized "run-shell '$statusbar_script'"
 
   # Left status: session name
   tmux set -g status-left "\
@@ -23,7 +25,7 @@ main() {
   fi
 
   tmux set -g status-right-length $STATUS_RIGHT_LENGTH
-  tmux set-hook -g client-attached "set -g status-right-length 1; run-shell 'sleep 1.1'; set -g status-right-length $STATUS_RIGHT_LENGTH;"
+  tmux set-hook -g client-attached "set -g status-right-length 1; run-shell 'sleep 1.1'; set -g status-right-length $STATUS_RIGHT_LENGTH; run-shell '$statusbar_script';"
 
   local session_name=$(tmux display-message -p '#S')
 
