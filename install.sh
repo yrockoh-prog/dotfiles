@@ -232,19 +232,28 @@ if [ -n "$ZSH_PATH" ]; then
     add_zsh_launcher "$HOME/.bash_profile"
 fi
 
-# 컨테이너에서 en_US.UTF-8 로케일 생성 시도 (없으면 setlocale 경고 발생)
+# 컨테이너에서 en_US.UTF-8 + ko_KR.UTF-8 로케일 생성 시도 (없으면 setlocale 경고·한글 깨짐 발생)
 if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -eq 0 ] && [ "$OS_TYPE" = "Linux" ]; then
-    if ! locale -a 2>/dev/null | grep -q en_US.UTF-8; then
-        echo "🌐 Generating locale en_US.UTF-8 (한글/UTF-8)..."
+    local_regen=0
+    if ! locale -a 2>/dev/null | grep -qi 'en_US\.utf'; then
+        echo "🌐 Generating locale en_US.UTF-8..."
         (apt-get update -qq && apt-get install -y -qq locales 2>/dev/null) || true
         (sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen) || true
-        locale-gen en_US.UTF-8 2>/dev/null || true
+        local_regen=1
+    fi
+    if ! locale -a 2>/dev/null | grep -qi 'ko_KR\.utf'; then
+        echo "🌐 Generating locale ko_KR.UTF-8 (한글/CJK wide character)..."
+        (sed -i 's/^# *ko_KR.UTF-8 UTF-8/ko_KR.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || echo 'ko_KR.UTF-8 UTF-8' >> /etc/locale.gen) || true
+        local_regen=1
+    fi
+    if [ "$local_regen" = "1" ]; then
+        locale-gen 2>/dev/null || true
         update-locale LANG=en_US.UTF-8 2>/dev/null || true
     fi
 fi
 # 사용할 UTF-8 로케일: en_US.UTF-8 있으면 사용, 없으면 C.UTF-8 (대부분 이미지에 있음)
 UTF8_LOCALE="C.UTF-8"
-if locale -a 2>/dev/null | grep -qx en_US.UTF-8; then
+if locale -a 2>/dev/null | grep -qi 'en_US\.utf'; then
     UTF8_LOCALE="en_US.UTF-8"
 fi
 
