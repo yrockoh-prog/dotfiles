@@ -229,6 +229,25 @@ if [ -n "$ZSH_PATH" ] && [ "$IN_CONTAINER" = "0" ]; then
     add_zsh_launcher "$HOME/.bash_profile"
 fi
 
+# UTF-8 로케일: bash/tmux 등에서도 한글 깨짐 방지 (도커 등에서 bash로 들어오면 .zshenv가 안 읽힘)
+add_utf8_to_bash() {
+    local home_dir="${1:-$HOME}"
+    local bashrc="$home_dir/.bashrc"
+    local bash_profile="$home_dir/.bash_profile"
+    local marker="dotfiles: UTF-8 locale"
+    for f in "$bashrc" "$bash_profile"; do
+        [ -f "$f" ] && grep -q "$marker" "$f" 2>/dev/null && continue
+        touch "$f" 2>/dev/null || true
+        echo "" >> "$f"
+        echo "# $marker (한글)" >> "$f"
+        echo 'export LANG=en_US.UTF-8' >> "$f"
+        echo 'export LC_ALL=en_US.UTF-8' >> "$f"
+        echo 'export LC_CTYPE=en_US.UTF-8' >> "$f"
+        echo "   UTF-8 locale added to $f"
+    done
+}
+add_utf8_to_bash "$HOME"
+
 # sudo로 실행했을 때 생성된 디렉터리/링크 소유자를 실제 사용자로
 if [[ -n "${SUDO_USER:-}" ]]; then
     SUDO_GROUP=$(id -gn "$SUDO_USER" 2>/dev/null || true)
@@ -276,6 +295,7 @@ if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -eq 0 ]; then
         link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
         link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
         link_file "$DOTFILES_DIR/caludecode/CLAUDE.md" "$HOME/CLAUDE.md"
+        add_utf8_to_bash "$DEV_HOME"
         chown -R "$CONTAINER_CLAUDE_USER:$CONTAINER_CLAUDE_USER" "$DEV_HOME" 2>/dev/null || true
         echo "   Dotfiles linked for $CONTAINER_CLAUDE_USER. Run 'claude' or 'cauto' as root → runs as $CONTAINER_CLAUDE_USER with --dangerously-skip-permissions."
     fi
@@ -284,3 +304,4 @@ fi
 echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."
 echo ""
 echo "💡 Tmux: 이미 실행 중이면 설정이 안 읽힙니다. tmux 안에서 Ctrl+a 누른 뒤 r 로 설정 리로드, 또는 tmux 완전히 종료 후 다시 실행."
+echo "💡 Docker에서 한글 깨짐: bash로 들어왔으면 위에서 .bashrc/.bash_profile에 UTF-8을 넣었음. 새 터미널을 열거나 source ~/.bashrc 후 tmux를 다시 띄우세요. 로케일이 없으면 sudo locale-gen en_US.UTF-8 또는 이미지에 해당 로케일이 있는지 확인하세요."
