@@ -279,45 +279,6 @@ if [[ -n "${SUDO_USER:-}" ]]; then
     fi
 fi
 
-# --- 컨테이너 root 전용: 별도 사용자(dev) 생성 + dotfiles 연결 → Claude만 그 사용자로 실행해 --dangerously-skip-permissions 가능
-CONTAINER_CLAUDE_USER="${CONTAINER_CLAUDE_USER:-dev}"
-if [ "$IN_CONTAINER" = "1" ] && [ "$EUID" -eq 0 ]; then
-    if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
-        echo "👤 User $CONTAINER_CLAUDE_USER already exists (Claude runs as this user for --dangerously-skip-permissions)."
-    else
-        echo "👤 Creating user $CONTAINER_CLAUDE_USER (container stays root; Claude will run as this user)."
-        useradd -m -s /bin/zsh "$CONTAINER_CLAUDE_USER" 2>/dev/null || true
-    fi
-    if getent passwd "$CONTAINER_CLAUDE_USER" &>/dev/null; then
-        DEV_HOME="$(getent passwd "$CONTAINER_CLAUDE_USER" | cut -d: -f6)"
-        BACKUP_DIR_DEV="$DEV_HOME/dotfiles_backup_$(date +%Y%m%d_%H%M%S)"
-        export HOME="$DEV_HOME"
-        export BACKUP_DIR="$BACKUP_DIR_DEV"
-        mkdir -p "$HOME/.tmux" "$HOME/.config"
-        [ ! -d "$HOME/.oh-my-zsh" ] && sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-        ZSH_CUSTOM="${HOME}/.oh-my-zsh/custom"
-        [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ] && git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions" 2>/dev/null || true
-        [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ] && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" 2>/dev/null || true
-        link_file "$DOTFILES_DIR/zsh/.zshenv" "$HOME/.zshenv"
-        link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
-        link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
-        [ -L "$HOME/.tmux/statusbar.tmux" ] && rm "$HOME/.tmux/statusbar.tmux"
-        [ -f "$HOME/.tmux/statusbar.tmux" ] && [ ! -L "$HOME/.tmux/statusbar.tmux" ] && mkdir -p "$BACKUP_DIR_DEV" && mv "$HOME/.tmux/statusbar.tmux" "$BACKUP_DIR_DEV/" 2>/dev/null || true
-        if [[ "$DOTFILES_DIR" == "$DEV_HOME"/* ]]; then
-            ln -sf "../${DOTFILES_DIR#$DEV_HOME/}/tmux/statusbar.tmux" "$HOME/.tmux/statusbar.tmux" 2>/dev/null || true
-        else
-            ln -sf "$DOTFILES_DIR/tmux/statusbar.tmux" "$HOME/.tmux/statusbar.tmux" 2>/dev/null || true
-        fi
-        [ -d "$HOME/.tmux/plugins/tpm" ] || git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
-        link_file "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
-        link_file "$DOTFILES_DIR/git/gitconfig" "$HOME/.gitconfig"
-        link_file "$DOTFILES_DIR/caludecode/CLAUDE.md" "$HOME/CLAUDE.md"
-        add_utf8_to_bash "$DEV_HOME"
-        chown -R "$CONTAINER_CLAUDE_USER:$CONTAINER_CLAUDE_USER" "$DEV_HOME" 2>/dev/null || true
-        echo "   Dotfiles linked for $CONTAINER_CLAUDE_USER. Run 'claude' or 'cauto' as root → runs as $CONTAINER_CLAUDE_USER with --dangerously-skip-permissions."
-    fi
-fi
-
 echo "✅ Installation Complete! Restart your terminal (or run 'exec zsh')."
 echo ""
 echo "💡 Tmux: 이미 실행 중이면 설정이 안 읽힙니다. tmux 안에서 Ctrl+a 누른 뒤 r 로 설정 리로드, 또는 tmux 완전히 종료 후 다시 실행."
