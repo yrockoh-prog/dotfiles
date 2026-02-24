@@ -34,12 +34,12 @@ require("lazy").setup({
   },
 
   -- 구문 강조
-  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate", config = function() 
-      require("nvim-treesitter.configs").setup { 
-        ensure_installed = { "c", "cpp", "python", "lua", "bash", "dockerfile", "json" }, 
-        highlight = { enable = true } 
-      } 
-    end 
+  { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate", config = function()
+      require("nvim-treesitter.config").setup {
+        ensure_installed = { "c", "cpp", "python", "lua", "bash", "dockerfile", "json" },
+        highlight = { enable = true }
+      }
+    end
   },
   
   -- 상태바
