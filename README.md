@@ -295,6 +295,25 @@ dotfiles/
    - 호스트(원격 서버)의 `~/dotfiles`를 컨테이너에 마운트해서 쓰거나,  
    - 먼저 `apt update && apt install -y git curl` 로 의존성을 설치한 뒤 위 2번을 반복합니다.
 
+4. **워크스페이스를 /workspace로 마운트한 경우 (HOME이 제대로 안 읽힐 때)**  
+   컨테이너 기본 HOME은 `/root`라서, `-v /path/on/host:/workspace` 만 주면 셸/tmux가 `/root`를 홈으로 씁니다. **실행 시 HOME을 /workspace로 주면** dotfiles·설정이 마운트된 디렉터리 기준으로 동작합니다.
+
+   ```bash
+   docker run --gpus all -it \
+     -v /home/mobilint/work_yr:/workspace \
+     -v /datasets:/datasets -v /models:/models \
+     -e HOME=/workspace -w /workspace \
+     --name yr_compiler mobilint/qbcompiler:1.0-cuda12.8.1-ubuntu22.04
+   ```
+
+   그다음 컨테이너 안에서:
+
+   ```bash
+   cd /workspace && git clone <저장소 URL> dotfiles && cd dotfiles && ./install.sh && exec zsh
+   ```
+
+   그러면 `~`는 `/workspace`가 되고, `.zshrc`, `.tmux.conf` 등도 `/workspace` 아래에 링크되며, 컨테이너를 다시 띄워도 같은 볼륨이면 설정이 유지됩니다.
+
 #### 방법 B: 컨테이너가 이미 있는 경우
 
 이미지 빌드는 하지 않고, **이미 떠 있는 컨테이너**에 들어가서 방법 A처럼 클론 후 `./install.sh`만 하면 됩니다. 컨테이너가 root면 설정은 모두 root 기준으로만 적용됩니다.
