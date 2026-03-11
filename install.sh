@@ -31,6 +31,51 @@ get_os() {
 OS_TYPE=$(get_os)
 echo "🖥️  Detected OS: $OS_TYPE"
 
+# --- Neovim 최신 stable 설치 (Linux) ---
+install_neovim_latest() {
+    local current_ver=""
+    if command -v nvim &> /dev/null; then
+        current_ver=$(nvim --version | head -1 | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+' || true)
+    fi
+
+    # GitHub API에서 최신 stable 태그 가져오기
+    local latest_tag
+    latest_tag=$(curl -fsSL https://api.github.com/repos/neovim/neovim/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+    local latest_ver=${latest_tag#v}
+
+    if [ "$current_ver" = "$latest_ver" ]; then
+        echo "✅ Neovim is already up to date ($current_ver)"
+        return 0
+    fi
+
+    echo "📦 Installing Neovim $latest_tag (current: ${current_ver:-none})..."
+    local arch
+    arch=$(uname -m)
+    local tarball="nvim-linux-${arch}.tar.gz"
+    local url="https://github.com/neovim/neovim/releases/latest/download/${tarball}"
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+
+    if curl -fsSL -o "$tmp_dir/$tarball" "$url"; then
+        tar -xzf "$tmp_dir/$tarball" -C "$tmp_dir"
+        local nvim_dir="$tmp_dir/nvim-linux-${arch}"
+        if [ "$EUID" -eq 0 ]; then
+            cp -rf "$nvim_dir"/* /usr/local/
+        else
+            sudo cp -rf "$nvim_dir"/* /usr/local/
+        fi
+        echo "✅ Neovim $latest_tag installed successfully"
+    else
+        echo "⚠️  Neovim tarball download failed, falling back to apt..."
+        if [ "$EUID" -eq 0 ]; then
+            apt-get install -y neovim
+        else
+            sudo apt-get install -y neovim
+        fi
+    fi
+    rm -rf "$tmp_dir"
+}
+
 # --- 2. 패키지 설치 ---
 install_packages() {
     # 컨테이너 안에서 비 root면 apt/brew 스킵 (이미지는 빌드 시 root로 패키지 설치됨)
@@ -55,14 +100,17 @@ install_packages() {
         if ! command -v node &> /dev/null; then
             [ "$EUID" -eq 0 ] && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - || curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
         fi
-        
+
         if [ "$EUID" -ne 0 ]; then
-             sudo apt-get update && sudo apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip \
+             sudo apt-get update && sudo apt-get install -y zsh tmux git curl wget ripgrep fd-find nodejs python3-pip \
                  fonts-noto-cjk fontconfig
         else
-             apt-get update && apt-get install -y zsh tmux neovim git curl wget ripgrep fd-find nodejs python3-pip \
+             apt-get update && apt-get install -y zsh tmux git curl wget ripgrep fd-find nodejs python3-pip \
                  fonts-noto-cjk fontconfig
         fi
+
+        # Neovim: apt 패키지는 구버전이므로 GitHub releases에서 최신 stable 설치
+        install_neovim_latest
         # 폰트 캐시 갱신 (한글/CJK 폰트 즉시 사용 가능하도록)
         fc-cache -f 2>/dev/null || true
     fi
